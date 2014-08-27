@@ -1,53 +1,66 @@
-
 //  Hello World server
 
-#include <zmq.h>
-#include <stdio.h>
-#include <unistd.h>
-#include <string>
-#include <assert.h>
+#include <czmq.h>
 #include <iostream>
+#include <unordered_map>
+#include <string>
+#include <cassert>
 
 using namespace std;
 
-int op(char b[6]){
-       string a,c;
-       int flag=0;
-       for(int i=0; i<(sizeof(b)/sizeof(*b));i++){
-               if(b[i]=='+')
-                flag=1;
-               if(b[i]!='+' and flag==0)
-               a.push_back(b[i]);
-               else c.push_back(b[i]);
-       }
-       //atoi( str.c_str() )
-       cout<<a<<" "<<c<<endl;
-       return atoi(a.c_str()) + atoi(c.c_str());
+typedef unordered_map<string,string> DictType;
+
+// Server's state
+DictType dict;
+
+void dispatch(zmsg_t *incmsg, zmsg_t *outmsg) {
+  zmsg_print(incmsg);
+  char *operation = zmsg_popstr(incmsg);
+  
+//  cout << "Operation: " << operation << endl;
+  
+  if(strcmp(operation,"Find") == 0) {
+    char *wordToLookUp = zmsg_popstr(incmsg);
+    string w(wordToLookUp);
+    free(wordToLookUp);
+    if (dict.count(w) > 0) {
+      zmsg_addstr(outmsg, dict[w].c_str());
+    } else {
+      zmsg_addstr(outmsg, "Word does not exists!!");
+    }
+    
+  } else if (strcmp(operation,"Add") == 0) {
+    char *wordToAdd = zmsg_popstr(incmsg);
+    char *meaningToAdd = zmsg_popstr(incmsg);   
+    string w(wordToAdd), m(meaningToAdd);
+ 	free(wordToAdd);
+ 	free(meaningToAdd);
+    dict[w] = m;
+    zmsg_addstr(outmsg, "Added");
+  } else {
+    zmsg_addstr(outmsg, "Error!!");
+  }
 }
 
 
 int main (void)
 {
-    //  Socket to talk to clients
-    string r;
-    void *context = zmq_ctx_new ();// por cada agente debe haber un cntexto
-    
-    void *responder = zmq_socket (context, ZMQ_REP);// REP de replay---- responder es el nombre del socket
-    
-    int rc = zmq_bind (responder, "tcp://*:5555");// bind  crea local el socket
-    
-    assert (rc == 0);// aborta si es 0
-
-    while (1) {				// se queda en un ciclo infinito esperando algo
-        char buffer [6];
-        zmq_recv (responder, buffer, 6, 0);
-        buffer[6] = '\0';
-        
-        printf ("Received Hola compita %s\n", buffer);
-        sleep (1);          //  Do some 'work'
-        r=to_string(op(buffer));
-        cout<<r<<endl;
-        zmq_send (responder, &r, 5, 0);
+  zctx_t *context = zctx_new();
+  void *responder = zsocket_new(context, ZMQ_REP);
+  zsocket_bind(responder, "tcp://*:5555");
+  
+  while (1) {
+    zmsg_t* request = zmsg_recv(responder);
+    zmsg_t *response = zmsg_new();
+    dispatch(request,response);
+    zmsg_send(&response,responder);
     }
+    
+    zctx_destroy(&context);
     return 0;
 }
+
+
+
+
+

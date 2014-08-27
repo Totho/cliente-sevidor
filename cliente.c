@@ -5,40 +5,41 @@
 
 using namespace std;
 
-int main (int argc, char** argv)
-{
-    printf ("Connecting to hello world server...\n");
-    zctx_t *context = zctx_new(); // nueva forma
-    void *requester = zsocket_new (context, ZMQ_REQ); // nuevo
-    zsocket_connect (requester, "tcp://192.68.8.156"); // nuevo
+int main(int argc, char** argv) {
+ 
+  zctx_t *context = zctx_new();
+  void *requester = zsocket_new(context, ZMQ_REQ);
+  zsocket_connect(requester, "tcp://192.168.8.156:5555");
 
-zmsg_t* request= zmsg_new(); // crear un mensaje vacio
-
-if(argv[1] == "find")
- {
-  zmsg_addstr (request, "find"); // agregrar find al mensaje request
-  zmsg_addstr (request, argv[2]);
-
-}else if(argv[1] == "add")
-{
- zmsg_addstr (request, "add");
-  zmsg_addstr (request, argv[2]);
-  zmsg_addstr (request, argv[3]);
-}else
-{
-cout <<"error\n";
-
+  // Creates an empty message
+  zmsg_t* request = zmsg_new();
+  
+  if (strcmp(argv[1],"find") == 0) {
+    zmsg_addstr(request,"Find");
+    zmsg_addstr(request,argv[2]);
+  } else if (strcmp(argv[1],"add") == 0) {
+    zmsg_addstr(request,"Add");
+    zmsg_addstr(request,argv[2]);
+    zmsg_addstr(request,argv[3]);
+  } else {
+    cout << "error!\n";
+  } 
+  
+  // Sends message request through socket requester
+  zmsg_send(&request,requester);
+  
+  zmsg_t* resp = zmsg_recv(requester);
+  
+  zmsg_print(resp);      
+         
+  zctx_destroy(&context);
+ 
+  return 0;
 }
 
-// sends message request through socket requester
-zmsg_send(&request, requester);
-zmsg_t* resp= zmsg_recv(requester);
 
 
-//printmsg(resp);
 
-zctx_destroy(&context);
 
-    
-    return 0;
-}
+
+
